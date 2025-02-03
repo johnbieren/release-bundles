@@ -642,7 +642,6 @@
               "topic",
               "description",
               "solution",
-              "references",
               "content"
             ],
             "properties": {
