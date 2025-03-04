@@ -4,7 +4,7 @@ kind: Task
 metadata:
   name: rh-sign-image
   labels:
-    app.kubernetes.io/version: "5.0.3"
+    app.kubernetes.io/version: "5.1.0"
   annotations:
     tekton.dev/pipelines.minVersion: "0.12.1"
     tekton.dev/tags: release
@@ -60,7 +60,7 @@ spec:
       description: workspace to read and save files
   steps:
     - name: sign-image
-      image: quay.io/konflux-ci/release-service-utils:7d0135b80a47cdaa225010ea1e2dff78d057c922
+      image: quay.io/konflux-ci/release-service-utils:863fee5fdf48937dead6a2355c67eb3b4f469340
       computeResources:
         limits:
           memory: 4Gi
@@ -113,14 +113,12 @@ spec:
         REQUESTTYPE=$(jq -r '.sign.requestType // "internal-request"' "${DATA_FILE}")
         service_account_name=$(jq -r '.spec.pipeline.serviceAccountName // "appstudio-pipeline"' "${RPA_FILE}")
         if [ "${REQUESTTYPE}" == "internal-pipelinerun" ] ; then
-          requestType=internal-pipelinerun
+          requestType=(internal-pipelinerun -r)
           EXTRA_ARGS=(
-          --task-git-url "$(params.taskGitUrl)"
-          --task-git-revision "$(params.taskGitRevision)"
           --service-account "${service_account_name}"
           )
         else
-          requestType=internal-request
+          requestType=(internal-request --pipeline)
           EXTRA_ARGS=()
         fi
         request=$(jq -r '.sign.request // "simple-signing-pipeline"' "${DATA_FILE}")
@@ -223,12 +221,12 @@ spec:
                       wait -n
                     done
 
-                    echo "Creating ${requestType} to sign image with tag ${tag}:"
+                    echo "Creating ${requestType%% *} to sign image with tag ${tag}:"
                     echo "- reference=${registry_reference}:${tag}"
                     echo "- manifest_digest=${manifest_digest}"
                     echo "- requester=$(params.requester)"
 
-                    ${requestType} -r "${request}" \
+                    "${requestType[@]}" "${request}" \
                       -p pipeline_image="${pipeline_image}" \
                       -p reference="${registry_reference}:${tag}" \
                       -p manifest_digest="${manifest_digest}" \
@@ -270,12 +268,12 @@ spec:
                         wait -n
                       done
 
-                      echo "Creating ${requestType} to sign image with tag ${tag}:"
+                      echo "Creating ${requestType%% *} to sign image with tag ${tag}:"
                       echo "- reference=${registry_reference}:${sourceTag}"
                       echo "- manifest_digest=${sourceContainerDigest}"
                       echo "- requester=$(params.requester)"
 
-                      ${requestType} -r "${request}" \
+                      "${requestType[@]}" "${request}" \
                         -p pipeline_image="${pipeline_image}" \
                         -p reference="${registry_reference}:${sourceTag}" \
                         -p manifest_digest="${sourceContainerDigest}" \

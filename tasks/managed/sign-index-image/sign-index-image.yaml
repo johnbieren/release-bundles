@@ -4,7 +4,7 @@ kind: Task
 metadata:
   name: sign-index-image
   labels:
-    app.kubernetes.io/version: "4.1.1"
+    app.kubernetes.io/version: "4.2.0"
   annotations:
     tekton.dev/pipelines.minVersion: "0.12.1"
     tekton.dev/tags: release
@@ -49,7 +49,7 @@ spec:
       description: workspace to read and save files
   steps:
     - name: sign-index-image
-      image: quay.io/konflux-ci/release-service-utils:7d0135b80a47cdaa225010ea1e2dff78d057c922
+      image: quay.io/konflux-ci/release-service-utils:863fee5fdf48937dead6a2355c67eb3b4f469340
       script: |
         #!/usr/bin/env bash
         set -e
@@ -64,21 +64,20 @@ spec:
             exit 1
         fi
 
-        requestType=$(jq -r '.sign.requestType // "internal-request"' "${DATA_FILE}")
-        if [ "${requestType}" == "internal-pipelinerun" ] ; then
+        REQUESTTYPE=$(jq -r '.sign.requestType // "internal-request"' "${DATA_FILE}")
+        if [ "${REQUESTTYPE}" == "internal-pipelinerun" ] ; then
           RPA_FILE="$(workspaces.data.path)/$(params.releasePlanAdmissionPath)"
           if [ ! -f "${RPA_FILE}" ] ; then
               echo "No valid rpa file was provided."
               exit 1
           fi
+          requestType=(internal-pipelinerun -r)
           service_account_name=$(jq -r '.spec.pipeline.serviceAccountName // "appstudio-pipeline"' "${RPA_FILE}")
           EXTRA_ARGS=(
-          --task-git-url "$(params.taskGitUrl)"
-          --task-git-revision "$(params.taskGitRevision)"
           --service-account "${service_account_name}"
           )
         else
-          requestType=internal-request
+          requestType=(internal-request --pipeline)
           EXTRA_ARGS=()
         fi
         request=$(jq -r '.sign.request // "simple-signing-pipeline"' "${DATA_FILE}")
@@ -97,12 +96,12 @@ spec:
         for manifest_digest in $(params.manifestListDigests)
         do
 
-          echo "Creating ${requestType} to sign image:"
+          echo "Creating ${requestType%% *} to sign image:"
           echo "- reference=${reference_image}"
           echo "- manifest_digest=${manifest_digest}"
           echo "- requester=$(params.requester)"
 
-          ${requestType} -r "${request}" \
+          "${requestType[@]}" "${request}" \
             -p pipeline_image="${pipeline_image}" \
             -p reference="${reference_image}" \
             -p manifest_digest="${manifest_digest}" \
